@@ -11,7 +11,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# 2. 커스텀 CSS
+# 2. 커스텀 CSS (프리미엄 다크 디자인)
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@100;400;700&display=swap');
@@ -74,24 +74,21 @@ else:
         user_data = df[df['작성자'] == search_nickname]
 
         if not user_data.empty:
-            # --- 통계 계산 ---
-            percentiles = [0.04, 0.11, 0.23, 0.40, 0.60, 0.77, 0.89, 0.96, 1.00]
-            grade_cuts = df['조회수'].quantile([1-p for p in percentiles]).values
-            
+            # --- 전체 통계 사전 계산 ---
             writer_stats = df.groupby('작성자')['조회수'].agg(['mean', 'max', 'count', 'sum']).reset_index()
             writer_stats.columns = ['작성자', '평균조회수', '최고조회수', '총게시글수', '누적조회수']
             writer_stats['화력순위'] = writer_stats['평균조회수'].rank(ascending=False, method='min')
             
             user_info = writer_stats[writer_stats['작성자'] == search_nickname].iloc[0]
             
-            # 1. 최고 조회수 백분위 (전체 게시글 중 위치)
+            # 백분위 계산
             top_view_pct = (df['조회수'] > user_info['최고조회수']).mean() * 100
-            
-            # 2. 실제 화력 백분위 (전체 작성자 중 위치)
             raw_pct = (writer_stats['평균조회수'].rank(pct=True).loc[user_info.name])
             user_pct_val = (1 - raw_pct) * 100
 
-            # 3. 등급 판정
+            # 등급 판정
+            percentiles = [0.04, 0.11, 0.23, 0.40, 0.60, 0.77, 0.89, 0.96, 1.00]
+            grade_cuts = df['조회수'].quantile([1-p for p in percentiles]).values
             grade = 9
             for i, cut in enumerate(grade_cuts):
                 if user_info['최고조회수'] >= cut:
@@ -99,7 +96,7 @@ else:
                     break
 
             # --- UI 출력 ---
-            # 성적표 카드
+            # 1. 성적표 카드
             st.markdown(f"""
                 <div class="report-card">
                     <p style='text-align: center; font-size: 1.2rem; color: #888; margin-bottom: 0;'>OFFICIAL ANALYSIS</p>
@@ -114,46 +111,60 @@ else:
                 </div>
             """, unsafe_allow_html=True)
 
-            # 지표 메트릭
+            # 2. 메트릭
             m1, m2, m3, m4 = st.columns(4)
             m1.metric("총 게시글", f"{int(user_info['총게시글수'])}개")
             m2.metric("누적 조회수", f"{int(user_info['누적조회수']):,}회")
             m3.metric("평균 조회수", f"{user_info['평균조회수']:.1f}회")
             m4.metric("화력 순위", f"전체 {int(user_info['화력순위'])}위")
             
-            # 설명 섹션
+            # 3. 설명란
             col_exp1, col_exp2 = st.columns(2)
             with col_exp1:
-                with st.expander("🎓 등급은 어떻게 결정되나요?"):
-                    st.write("최고 조회수를 기준으로 결정됩니다. '상위 4%' 안에 드는 글이 하나라도 있으면 1등급을 획득합니다.")
+                with st.expander("🎓 등급 결정 기준"):
+                    st.write("단일 게시글의 **최고 조회수**를 기준으로 합니다. 한 번의 강력한 영향력을 측정합니다.")
             with col_exp2:
-                with st.expander("🔥 화력 순위 및 백분위 기준"):
-                    st.write("평균 조회수를 기준으로 한 '인플루언서' 지표입니다. 백분위가 낮을수록 모든 글이 골고루 인기가 많음을 뜻합니다.")
+                with st.expander("🔥 화력 및 백분위 기준"):
+                    st.write("**평균 조회수** 기준입니다. 모든 글의 평균적인 파급력(인플루언서 지수)을 측정합니다.")
 
             st.markdown("<br>", unsafe_allow_html=True)
 
-            # 탭 섹션
-            tab1, tab2, tab3 = st.tabs(["📊 나의 인기글 TOP 100", "🏆 전체 랭킹 TOP 100", "📥 데이터 소장"])
+            # 4. 탭 구성 (화력 랭킹 추가)
+            tab1, tab2, tab3, tab4 = st.tabs([
+                "📊 나의 인기글", 
+                "🏆 게시글 랭킹", 
+                "🔥 화력왕 랭킹 (TOP 100)", 
+                "📥 소장하기"
+            ])
             
             with tab1:
-                my_top = user_data.sort_values(by='조회수', ascending=False).head(100)[['제목', '작성날짜', '조회수']]
-                st.dataframe(my_top, use_container_width=True)
+                st.markdown("### 나의 조회수 TOP 100")
+                st.dataframe(user_data.sort_values('조회수', ascending=False).head(100)[['제목', '작성날짜', '조회수']], use_container_width=True)
 
             with tab2:
-                cafe_top = df.sort_values(by='조회수', ascending=False).head(100)[['제목', '작성자', '조회수']]
-                def highlight_me(row):
-                    if row['작성자'] == search_nickname:
-                        return ['background-color: #007bff; color: white'] * len(row)
-                    return [''] * len(row)
-                st.dataframe(cafe_top.style.apply(highlight_me, axis=1), use_container_width=True)
+                st.markdown("### 카페 게시글 조회수 TOP 100")
+                cafe_top = df.sort_values('조회수', ascending=False).head(100)[['제목', '작성자', '조회수']]
+                def highlight_me_name(row):
+                    return ['background-color: #007bff; color: white'] * len(row) if row['작성자'] == search_nickname else [''] * len(row)
+                st.dataframe(cafe_top.style.apply(highlight_me_name, axis=1), use_container_width=True)
 
             with tab3:
+                st.markdown("### 카페 화력왕 TOP 100 (평균 조회수 기준)")
+                st.write("최소 1개 이상의 글을 작성한 유저 중 게시글당 평균 파급력이 높은 순위입니다.")
+                fire_top_100 = writer_stats.sort_values('평균조회수', ascending=False).head(100)[['작성자', '평균조회수', '총게시글수', '누적조회수']]
+                fire_top_100.insert(0, '순위', range(1, len(fire_top_100) + 1))
+                
+                def highlight_me_fire(row):
+                    return ['background-color: #ffd700; color: black'] * len(row) if row['작성자'] == search_nickname else [''] * len(row)
+                st.dataframe(fire_top_100.style.apply(highlight_me_fire, axis=1), use_container_width=True)
+
+            with tab4:
                 output = io.BytesIO()
                 with pd.ExcelWriter(output, engine='openpyxl') as writer:
                     user_data.to_excel(writer, index=False)
-                st.download_button("💾 엑셀 다운로드", output.getvalue(), f"Report_{search_nickname}.xlsx")
+                st.download_button("💾 나의 활동 데이터 다운로드 (Excel)", output.getvalue(), f"Cube_Report_{search_nickname}.xlsx")
 
         else:
-            st.warning("등록된 닉네임이 없습니다! 정확한 닉네임을 입력해 주세요.")
+            st.warning("등록된 닉네임이 없습니다!")
 
-    st.markdown("<br><br><p style='text-align: center; color: #555;'>CubeMania Data Vault v2.7 | © 2026</p>", unsafe_allow_html=True)
+    st.markdown("<br><br><p style='text-align: center; color: #555;'>CubeMania Data Vault v2.8 Final</p>", unsafe_allow_html=True)
