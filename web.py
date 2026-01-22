@@ -140,4 +140,4 @@ else:
             st.markdown("<br>", unsafe_allow_html=True)
 
             # 탭 디자인
-            tab1, tab2, tab
+            tab1, tab2, tab3
