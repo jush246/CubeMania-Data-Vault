@@ -3,7 +3,7 @@ import pandas as pd
 import os
 import io
 
-# 1. 페이지 설정 (탭 이름과 아이콘 변경)
+# 1. 페이지 설정
 st.set_page_config(
     page_title="CubeMania 2025 Vault",
     page_icon="💎",
@@ -11,20 +11,12 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# 2. 커스텀 CSS (더 현대적이고 세련된 스타일)
+# 2. 커스텀 CSS
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@100;400;700&display=swap');
-    
-    html, body, [class*="css"] {
-        font-family: 'Noto Sans KR', sans-serif;
-    }
-    
-    .main {
-        background-color: #0e1117;
-    }
-    
-    /* 성적표 카드 스타일 */
+    html, body, [class*="css"] { font-family: 'Noto Sans KR', sans-serif; }
+    .main { background-color: #0e1117; }
     .report-card {
         padding: 30px;
         border-radius: 20px;
@@ -34,47 +26,28 @@ st.markdown("""
         margin-bottom: 25px;
         color: white;
     }
-    
-    /* 등급 폰트 강조 */
     .grade-text {
-        font-size: 3rem;
+        font-size: 3.5rem;
         font-weight: 900;
         background: -webkit-linear-gradient(#ffd700, #ff8c00);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         text-align: center;
-        margin-bottom: 0px;
+        margin: 10px 0;
     }
-
-    /* 메트릭 박스 디자인 */
-    .metric-box {
-        background: rgba(255, 255, 255, 0.05);
-        padding: 15px;
-        border-radius: 12px;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        transition: transform 0.3s ease;
-    }
-    .metric-box:hover {
-        transform: translateY(-5px);
-        background: rgba(255, 255, 255, 0.1);
-    }
-    
-    /* 버튼 스타일 */
     .stButton>button {
         border-radius: 8px;
         background: linear-gradient(90deg, #007bff, #00d4ff);
         border: none;
         color: white;
-        transition: all 0.3s;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# 데이터 로딩 함수 (기존과 동일)
+# 3. 데이터 로딩
 @st.cache_data
 def load_data(file_name):
-    if not os.path.exists(file_name):
-        return None
+    if not os.path.exists(file_name): return None
     df = pd.read_excel(file_name)
     df['조회수'] = pd.to_numeric(df['조회수'], errors='coerce').fillna(0)
     df['제목'] = df['제목'].astype(str)
@@ -83,21 +56,16 @@ def load_data(file_name):
 file_name = "큐브매니아_2025_순수데이터.xlsx"
 df = load_data(file_name)
 
-# 사이드바
+# 4. 사이드바
 st.sidebar.image("https://img.icons8.com/fluency/96/cube.png", width=80)
 st.sidebar.title("CubeMania Vault")
-st.sidebar.markdown("---")
-st.sidebar.write("📅 **2025년 통합 성적표**")
-st.sidebar.info("당신의 열정을 데이터로 확인하세요.")
+st.sidebar.info("2025년 카페 활동 통합 성적표")
 
 if df is None:
     st.error(f"❌ '{file_name}' 파일을 찾을 수 없습니다.")
 else:
-    # 헤더 섹션
-    st.markdown("<h1 style='text-align: center; font-size: 3rem;'>🏆 2025 성적표 발급기</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; color: #888;'>큐브매니아 카페 활동 데이터를 기반으로 산출된 공식 리포트입니다.</p>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center;'>🏆 2025 성적표 발급기</h1>", unsafe_allow_html=True)
     
-    # 검색창을 중앙으로 배치하기 위한 컬럼 설정
     _, search_col, _ = st.columns([1, 2, 1])
     with search_col:
         search_nickname = st.text_input("", placeholder="닉네임을 입력하고 엔터를 누르세요")
@@ -106,14 +74,20 @@ else:
         user_data = df[df['작성자'] == search_nickname]
 
         if not user_data.empty:
-            # 데이터 계산 부분 (기존 로직 유지)
+            # 데이터 통계 계산
             percentiles = [0.04, 0.11, 0.23, 0.40, 0.60, 0.77, 0.89, 0.96, 1.00]
             grade_cuts = df['조회수'].quantile([1-p for p in percentiles]).values
+            
             writer_stats = df.groupby('작성자')['조회수'].agg(['mean', 'max', 'count', 'sum']).reset_index()
             writer_stats.columns = ['작성자', '평균조회수', '최고조회수', '총게시글수', '누적조회수']
             writer_stats['화력순위'] = writer_stats['평균조회수'].rank(ascending=False, method='min')
+            
+            # 백분위 계산 (0~100 사이 값으로 변환)
             user_info = writer_stats[writer_stats['작성자'] == search_nickname].iloc[0]
+            raw_pct = (writer_stats['평균조회수'].rank(pct=True).loc[user_info.name])
+            user_pct_val = (1 - raw_pct) * 100
 
+            # 등급 판정
             grade = 9
             for i, cut in enumerate(grade_cuts):
                 if user_info['최고조회수'] >= cut:
@@ -123,53 +97,54 @@ else:
             # 성적표 카드 출력
             st.markdown(f"""
                 <div class="report-card">
-                    <p style='text-align: center; font-size: 1.5rem; margin-bottom: 0;'>2025 OFFICIAL REPORT</p>
+                    <p style='text-align: center; font-size: 1.2rem; color: #888; margin-bottom: 0;'>OFFICIAL ANALYSIS</p>
                     <h1 style='text-align: center; margin-top: 0;'>{search_nickname}</h1>
                     <div class="grade-text">{grade}등급</div>
-                    <p style='text-align: center; font-size: 1.1rem; color: #aaa;'>상위 {int(percentiles[grade-1]*100)}% 이내의 활약</p>
+                    <p style='text-align: center; font-size: 1.1rem;'>
+                        상위 {int(percentiles[grade-1]*100)}% 등급 구간 <br>
+                        <span style='color: #ffd700;'>(실제 화력 백분위: 상위 {user_pct_val:.1f}%)</span>
+                    </p>
                 </div>
             """, unsafe_allow_html=True)
 
-            # 지표 4개를 가로로 예쁘게
+            # 지표 레이아웃
             m1, m2, m3, m4 = st.columns(4)
             m1.metric("총 게시글", f"{int(user_info['총게시글수'])}개")
             m2.metric("누적 조회수", f"{int(user_info['누적조회수']):,}회")
             m3.metric("평균 조회수", f"{user_info['평균조회수']:.1f}회")
             m4.metric("화력 순위", f"전체 {int(user_info['화력순위'])}위")
+            
+            with st.expander("🔥 화력 순위는 어떻게 계산되나요?"):
+                st.write("화력 순위는 **'평균 조회수'**를 기준으로 합니다. 단순히 글을 많이 쓴 것이 아니라, 게시글 하나당 얼마나 많은 사람들의 반응을 이끌어냈는지를 나타내는 '파급력' 지표입니다.")
 
             st.markdown("<br>", unsafe_allow_html=True)
 
-           # 탭 디자인 (이 부분을 아래 코드로 교체하세요)
-            tab1, tab2, tab3 = st.tabs(["🔥 나의 인기글", "🌍 전체 랭킹", "💾 소장하기"])
+            # 탭 섹션
+            tab1, tab2, tab3 = st.tabs(["📊 나의 인기글 TOP 100", "🏆 전체 랭킹 TOP 100", "📥 데이터 소장"])
             
             with tab1:
-                st.markdown("### 📊 나의 TOP 20 게시물")
-                my_top_20 = user_data.sort_values(by='조회수', ascending=False).head(20)[['제목', '작성날짜', '조회수']]
-                st.dataframe(my_top_20, use_container_width=True)
+                my_top = user_data.sort_values(by='조회수', ascending=False).head(100)[['제목', '작성날짜', '조회수']]
+                st.dataframe(my_top, use_container_width=True)
 
             with tab2:
-                st.markdown("### 🏆 카페 전체 인기 게시물")
-                cafe_top_100 = df.sort_values(by='조회수', ascending=False).head(100)[['제목', '작성자', '조회수']]
-                st.dataframe(cafe_top_100, use_container_width=True)
+                cafe_top = df.sort_values(by='조회수', ascending=False).head(100)[['제목', '작성자', '조회수']]
+                
+                # 내 이름 강조 스타일 함수
+                def highlight_me(row):
+                    if row['작성자'] == search_nickname:
+                        return ['background-color: #007bff; color: white'] * len(row)
+                    return [''] * len(row)
+
+                st.dataframe(cafe_top.style.apply(highlight_me, axis=1), use_container_width=True)
 
             with tab3:
-                st.markdown("### 📥 성적표 데이터 내보내기")
-                st.write("성적표를 엑셀 파일로 저장하여 소장할 수 있습니다.")
-                
-                # 엑셀 파일 생성 (메모리 버퍼 사용)
+                st.info("성적표 데이터를 엑셀로 다운로드합니다.")
                 output = io.BytesIO()
-                with pd.ExcelWriter(output, engine='openpyxl') as excel_writer:
-                    user_data.to_excel(excel_writer, index=False, sheet_name='나의데이터')
-                
-                st.download_button(
-                    label="💾 엑셀 성적표 다운로드",
-                    data=output.getvalue(),
-                    file_name=f"Cube_Report_2025_{search_nickname}.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
+                with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                    user_data.to_excel(writer, index=False)
+                st.download_button("💾 엑셀 다운로드", output.getvalue(), f"Report_{search_nickname}.xlsx")
 
         else:
-            st.warning(f"⚠️ '{search_nickname}' 닉네임을 찾을 수 없습니다. 정확한 닉네임을 입력해주세요!")
+            st.warning("등록된 닉네임이 없습니다!")
 
-    # 하단 풋터
-    st.markdown("<br><br><p style='text-align: center; color: #555;'>© 2025 CubeMania Data Vault | Powered by Streamlit</p>", unsafe_allow_html=True)
+    st.markdown("<br><br><p style='text-align: center; color: #555;'>CubeMania Data Vault v2.5</p>", unsafe_allow_html=True)
