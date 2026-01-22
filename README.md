@@ -11,3 +11,5 @@
 - **언어**: Python 3.14
 - **라이브러리**: Pandas, Openpyxl
 - **배포**: PyInstaller (.exe)
+
+(cube.py=크롤러 코드)
