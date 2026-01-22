@@ -149,8 +149,8 @@ else:
 
             with tab2:
                 st.markdown("### 🏆 카페 전체 인기 게시물")
-                cafe_top_20 = df.sort_values(by='조회수', ascending=False).head(20)[['제목', '작성자', '조회수']]
-                st.dataframe(cafe_top_20, use_container_width=True)
+                cafe_top_100 = df.sort_values(by='조회수', ascending=False).head(100)[['제목', '작성자', '조회수']]
+                st.dataframe(cafe_top_100, use_container_width=True)
 
             with tab3:
                 st.markdown("### 📥 성적표 데이터 내보내기")
