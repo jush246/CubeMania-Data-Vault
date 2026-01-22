@@ -139,5 +139,37 @@ else:
 
             st.markdown("<br>", unsafe_allow_html=True)
 
-            # 탭 디자인
-            tab1, tab2, tab3
+           # 탭 디자인 (이 부분을 아래 코드로 교체하세요)
+            tab1, tab2, tab3 = st.tabs(["🔥 나의 인기글", "🌍 전체 랭킹", "💾 소장하기"])
+            
+            with tab1:
+                st.markdown("### 📊 나의 TOP 20 게시물")
+                my_top_20 = user_data.sort_values(by='조회수', ascending=False).head(20)[['제목', '작성날짜', '조회수']]
+                st.dataframe(my_top_20, use_container_width=True)
+
+            with tab2:
+                st.markdown("### 🏆 카페 전체 인기 게시물")
+                cafe_top_20 = df.sort_values(by='조회수', ascending=False).head(20)[['제목', '작성자', '조회수']]
+                st.dataframe(cafe_top_20, use_container_width=True)
+
+            with tab3:
+                st.markdown("### 📥 성적표 데이터 내보내기")
+                st.write("성적표를 엑셀 파일로 저장하여 소장할 수 있습니다.")
+                
+                # 엑셀 파일 생성 (메모리 버퍼 사용)
+                output = io.BytesIO()
+                with pd.ExcelWriter(output, engine='openpyxl') as excel_writer:
+                    user_data.to_excel(excel_writer, index=False, sheet_name='나의데이터')
+                
+                st.download_button(
+                    label="💾 엑셀 성적표 다운로드",
+                    data=output.getvalue(),
+                    file_name=f"Cube_Report_2025_{search_nickname}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
+
+        else:
+            st.warning(f"⚠️ '{search_nickname}' 닉네임을 찾을 수 없습니다. 정확한 닉네임을 입력해주세요!")
+
+    # 하단 풋터
+    st.markdown("<br><br><p style='text-align: center; color: #555;'>© 2025 CubeMania Data Vault | Powered by Streamlit</p>", unsafe_allow_html=True)
