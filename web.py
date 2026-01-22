@@ -11,7 +11,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# 2. 커스텀 CSS (프리미엄 다크 모드 디자인)
+# 2. 커스텀 CSS
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@100;400;700&display=swap');
@@ -44,7 +44,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 3. 데이터 로딩 함수
+# 3. 데이터 로딩
 @st.cache_data
 def load_data(file_name):
     if not os.path.exists(file_name): return None
@@ -56,17 +56,16 @@ def load_data(file_name):
 file_name = "큐브매니아_2025_순수데이터.xlsx"
 df = load_data(file_name)
 
-# 4. 사이드바 구성
+# 4. 사이드바
 st.sidebar.image("https://img.icons8.com/fluency/96/cube.png", width=80)
 st.sidebar.title("CubeMania Vault")
-st.sidebar.info("2025년 카페 활동 통합 성적표")
+st.sidebar.info("2025-2026 활동 데이터 분석")
 
 if df is None:
     st.error(f"❌ '{file_name}' 파일을 찾을 수 없습니다.")
 else:
     st.markdown("<h1 style='text-align: center;'>🏆 2025 성적표 발급기</h1>", unsafe_allow_html=True)
     
-    # 검색창 중앙 배치
     _, search_col, _ = st.columns([1, 2, 1])
     with search_col:
         search_nickname = st.text_input("", placeholder="닉네임을 입력하고 엔터를 누르세요")
@@ -75,7 +74,7 @@ else:
         user_data = df[df['작성자'] == search_nickname]
 
         if not user_data.empty:
-            # --- 통계 계산 섹션 ---
+            # --- 통계 계산 ---
             percentiles = [0.04, 0.11, 0.23, 0.40, 0.60, 0.77, 0.89, 0.96, 1.00]
             grade_cuts = df['조회수'].quantile([1-p for p in percentiles]).values
             
@@ -85,57 +84,55 @@ else:
             
             user_info = writer_stats[writer_stats['작성자'] == search_nickname].iloc[0]
             
-            # 실제 화력 백분위 계산
+            # 1. 최고 조회수 백분위 (전체 게시글 중 위치)
+            top_view_pct = (df['조회수'] > user_info['최고조회수']).mean() * 100
+            
+            # 2. 실제 화력 백분위 (전체 작성자 중 위치)
             raw_pct = (writer_stats['평균조회수'].rank(pct=True).loc[user_info.name])
             user_pct_val = (1 - raw_pct) * 100
 
-            # 등급 판정
+            # 3. 등급 판정
             grade = 9
             for i, cut in enumerate(grade_cuts):
                 if user_info['최고조회수'] >= cut:
                     grade = i + 1
                     break
 
-            # --- UI 출력 섹션 ---
-            # 1. 성적표 카드 (실제 백분위 강조)
+            # --- UI 출력 ---
+            # 성적표 카드
             st.markdown(f"""
                 <div class="report-card">
-                    <p style='text-align: center; font-size: 1.2rem; color: #888; margin-bottom: 0;'>2025 OFFICIAL REPORT</p>
+                    <p style='text-align: center; font-size: 1.2rem; color: #888; margin-bottom: 0;'>OFFICIAL ANALYSIS</p>
                     <h1 style='text-align: center; margin-top: 0;'>{search_nickname}</h1>
                     <div class="grade-text">{grade}등급</div>
+                    <p style='text-align: center; font-size: 1.1rem; margin-bottom: 5px;'>
+                        최고 조회수 기록: <span style='color: #00d4ff; font-weight: bold;'>상위 {top_view_pct:.2f}%</span>
+                    </p>
                     <p style='text-align: center; font-size: 1.3rem; font-weight: bold; color: #ffd700;'>
                         실제 화력 백분위: 상위 {user_pct_val:.1f}%
                     </p>
                 </div>
             """, unsafe_allow_html=True)
 
-            # 2. 주요 지표 메트릭
+            # 지표 메트릭
             m1, m2, m3, m4 = st.columns(4)
             m1.metric("총 게시글", f"{int(user_info['총게시글수'])}개")
             m2.metric("누적 조회수", f"{int(user_info['누적조회수']):,}회")
             m3.metric("평균 조회수", f"{user_info['평균조회수']:.1f}회")
             m4.metric("화력 순위", f"전체 {int(user_info['화력순위'])}위")
             
-            # 3. 상세 설명 펼치기 (Expander)
+            # 설명 섹션
             col_exp1, col_exp2 = st.columns(2)
             with col_exp1:
                 with st.expander("🎓 등급은 어떻게 결정되나요?"):
-                    st.write("""
-                        **최고 조회수**를 기준으로 결정됩니다. 
-                        단 한 번이라도 카페에 큰 파급력을 보여준 게시물이 있다면 높은 등급을 받게 됩니다.
-                        (1등급: 상위 4%, 2등급: 11%, 3등급: 23% 등)
-                    """)
+                    st.write("최고 조회수를 기준으로 결정됩니다. '상위 4%' 안에 드는 글이 하나라도 있으면 1등급을 획득합니다.")
             with col_exp2:
                 with st.expander("🔥 화력 순위 및 백분위 기준"):
-                    st.write("""
-                        **평균 조회수**를 기준으로 합니다. 
-                        게시글 하나당 얼마나 많은 반응을 이끌어냈는지를 나타내는 '평균 파급력' 지표입니다. 
-                        백분위가 0%에 가까울수록 카페 내 영향력이 높음을 의미합니다.
-                    """)
+                    st.write("평균 조회수를 기준으로 한 '인플루언서' 지표입니다. 백분위가 낮을수록 모든 글이 골고루 인기가 많음을 뜻합니다.")
 
             st.markdown("<br>", unsafe_allow_html=True)
 
-            # 4. 탭 구성 (TOP 100 및 내 닉네임 강조)
+            # 탭 섹션
             tab1, tab2, tab3 = st.tabs(["📊 나의 인기글 TOP 100", "🏆 전체 랭킹 TOP 100", "📥 데이터 소장"])
             
             with tab1:
@@ -144,24 +141,19 @@ else:
 
             with tab2:
                 cafe_top = df.sort_values(by='조회수', ascending=False).head(100)[['제목', '작성자', '조회수']]
-                
-                # 내 닉네임 하이라이트 함수
                 def highlight_me(row):
                     if row['작성자'] == search_nickname:
                         return ['background-color: #007bff; color: white'] * len(row)
                     return [''] * len(row)
-
                 st.dataframe(cafe_top.style.apply(highlight_me, axis=1), use_container_width=True)
 
             with tab3:
-                st.info("성적표 데이터를 엑셀로 다운로드합니다.")
                 output = io.BytesIO()
                 with pd.ExcelWriter(output, engine='openpyxl') as writer:
                     user_data.to_excel(writer, index=False)
                 st.download_button("💾 엑셀 다운로드", output.getvalue(), f"Report_{search_nickname}.xlsx")
 
         else:
-            st.warning(f"⚠️ '{search_nickname}' 닉네임을 찾을 수 없습니다. 대소문자를 확인해 주세요!")
+            st.warning("등록된 닉네임이 없습니다! 정확한 닉네임을 입력해 주세요.")
 
-    # 5. 하단 풋터
-    st.markdown("<br><br><p style='text-align: center; color: #555;'>© 2025 CubeMania Data Vault v2.6</p>", unsafe_allow_html=True)
+    st.markdown("<br><br><p style='text-align: center; color: #555;'>CubeMania Data Vault v2.7 | © 2026</p>", unsafe_allow_html=True)
